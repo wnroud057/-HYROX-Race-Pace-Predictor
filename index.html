@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HYROX Race Pace Predictor | 配速計算機</title>
+  <meta name="description" content="計算你嘅HYROX完賽時間，拆解8個Station黃金配速計劃。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface2: #1e1e1e;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.15);
+      --accent: #e8ff47;
+      --accent-dim: rgba(232,255,71,0.12);
+      --accent-border: rgba(232,255,71,0.3);
+      --text: #f0f0f0;
+      --text-muted: #888;
+      --text-dim: #555;
+      --red: #ff4e4e;
+      --red-dim: rgba(255,78,78,0.12);
+      --orange: #ff8c42;
+      --orange-dim: rgba(255,140,66,0.12);
+      --green: #4fffb0;
+      --green-dim: rgba(79,255,176,0.12);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .noise {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      opacity: 0.4;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+      position: relative; z-index: 1;
+    }
+
+    header {
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+      border-bottom: 0.5px solid var(--border);
+      margin-bottom: 2rem;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(48px, 10vw, 80px);
+      line-height: 0.95;
+      letter-spacing: 0.02em;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 420px;
+      margin: 0.75rem auto 0;
+    }
+
+    .mode-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 1.5rem;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px;
+    }
+
+    .mode-btn {
+      padding: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 12px;
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 1.25rem;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .time-input {
+      width: 54px;
+      text-align: center;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 0.05em;
+      padding: 8px 4px;
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+      -moz-appearance: textfield;
+    }
+
+    .time-input::-webkit-inner-spin-button,
+    .time-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    .time-input:focus { border-color: var(--accent); }
+
+    .time-sep {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px;
+      color: var(--text-dim);
+    }
+
+    .time-unit {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    select {
+      width: 100%;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 10px 12px;
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    select:focus { border-color: var(--accent); }
+
+    .calc-btn {
+      width: 100%;
+      padding: 16px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 0.08em;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: #000;
+      cursor: pointer;
+      margin-bottom: 1.5rem;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    .calc-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .calc-btn:active { transform: scale(0.99); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 1.5rem;
+    }
+
+    .metric {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .metric-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .metric-lbl {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .warn-box {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: var(--orange-dim);
+      border: 0.5px solid var(--orange);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--orange);
+      margin-bottom: 1.25rem;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 0.5px solid var(--border);
+      color: var(--text);
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr.run-row td { color: var(--text-muted); font-size: 12px; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-easy { background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green); }
+    .badge-med { background: var(--orange-dim); color: var(--orange); border: 0.5px solid var(--orange); }
+    .badge-hard { background: var(--red-dim); color: var(--red); border: 0.5px solid var(--red); }
+    .badge-run { background: rgba(255,255,255,0.05); color: var(--text-muted); border: 0.5px solid var(--border); }
+
+    .tip-box {
+      background: var(--accent-dim);
+      border: 0.5px solid var(--accent-border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--accent);
+      margin-top: 1.25rem;
+      line-height: 1.6;
+    }
+
+    .tip-box strong { font-weight: 600; }
+
+    .cta-box {
+      margin-top: 2rem;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .cta-box p {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .cta-box strong { color: var(--text); }
+
+
+    .hidden { display: none !important; }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0 1rem;
+      font-size: 12px;
+      color: var(--text-dim);
+      border-top: 0.5px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 600px) {
+      .input-grid { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      h1 { font-size: 52px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="container">
+    <header>
+      <p class="eyebrow">Hyrox Tool</p>
+      <h1>RACE <span>PACE</span><br>PREDICTOR</h1>
+      <p class="subtitle">輸入你嘅體能數據，即刻獲得8個Station黃金配速計劃，唔再爆計。</p>
+    </header>
+
+    <div class="mode-toggle">
+      <button class="mode-btn active" onclick="setMode('input')" id="btn-input">由體能計算</button>
+      <button class="mode-btn" onclick="setMode('target')" id="btn-target">設定目標時間</button>
+    </div>
+
+    <div id="panel-input">
+      <div class="input-grid">
+        <div class="card">
+          <span class="field-label">1km 跑步時間</span>
+          <div class="time-row">
+            <input class="time-input" id="run-min" type="number" min="3" max="12" value="5" />
+            <span class="time-sep">:</span>
+            <input class="time-input" id="run-sec" type="number" min="0" max="59" value="30" />
+            <span class="time-unit">分:秒</span>
+          </div>
+        </div>
+        <div class="card">
+          <span class="field-label">Sled Push 預計時間</span>
+          <div class="time-row">
+            <input class="time-input" id="sled-min" type="number" min="0" max="10" value="2" />
+            <span class="time-sep">:</span>
+            <input class="time-input" id="sled-sec" type="number" min="0" max="59" value="30" />
+            <span class="time-unit">分:秒</span>
+          </div>
+        </div>
+        <div class="card">
+          <span class="field-label">性別</span>
+          <select id="gender">
+            <option value="male">男性</option>
+            <option value="female">女性</option>
+          </select>
+        </div>
+        <div class="card">
+          <span class="field-label">訓練水平</span>
+          <select id="level">
+            <option value="beginner">新手（初次參加）</option>
+            <option value="intermediate" selected>中級（有訓練基礎）</option>
+            <option value="advanced">高級（精英備戰）</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-target" class="hidden">
+      <div class="card" style="margin-bottom:1.25rem">
+        <span class="field-label">目標完賽時間</span>
+        <div class="time-row">
+          <input class="time-input" id="target-hr" type="number" min="0" max="3" value="1" />
+          <span class="time-sep">:</span>
+          <input class="time-input" id="target-min" type="number" min="0" max="59" value="15" />
+          <span class="time-unit">小時:分鐘</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="calc-btn" onclick="calculate()">計算我嘅配速計劃</button>
+
+    <div id="results" class="hidden">
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-val" id="res-total">—</div>
+          <div class="metric-lbl">預計完賽</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val" id="res-run">—</div>
+          <div class="metric-lbl">總跑步時間</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val" id="res-station">—</div>
+          <div class="metric-lbl">Station時間</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val" id="res-roxzone">—</div>
+          <div class="metric-lbl">Roxzone緩衝</div>
+        </div>
+      </div>
+
+      <div id="warn-box" class="warn-box hidden">
+        ⚠️ <span id="warn-text"></span>
+      </div>
+
+      <div class="card">
+        <p class="section-label">黃金配速時間表</p>
+        <table>
+          <thead>
+            <tr>
+              <th>段落</th>
+              <th>目標時間</th>
+              <th>累計</th>
+              <th>難度</th>
+            </tr>
+          </thead>
+          <tbody id="pace-body"></tbody>
+        </table>
+      </div>
+
+      <div class="tip-box" id="tip-box">
+        <strong>備賽建議：</strong> <span id="tip-text"></span>
+      </div>
+
+      <div class="cta-box">
+        <p>想要完整備賽攻略？<br><strong>Follow 我地 IG 並留言指定關鍵字，即刻免費獲取！</strong></p>
+        <a href="https://www.instagram.com/hyrox_builder" target="_blank" style="display:inline-flex;align-items:center;gap:8px;margin-top:0.75rem;padding:10px 20px;border:0.5px solid var(--accent-border);border-radius:var(--radius-sm);color:var(--accent);font-size:14px;font-weight:600;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background='transparent'">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+          @hyrox_builder
+        </a>
+      </div>
+    </div>
+
+    <footer>
+      數據僅供參考，實際成績受比賽當日狀態影響。
+    </footer>
+  </div>
+
+  <script>
+    let currentMode = 'input';
+
+    function setMode(m) {
+      currentMode = m;
+      document.getElementById('panel-input').classList.toggle('hidden', m !== 'input');
+      document.getElementById('panel-target').classList.toggle('hidden', m !== 'target');
+      document.getElementById('btn-input').classList.toggle('active', m === 'input');
+      document.getElementById('btn-target').classList.toggle('active', m === 'target');
+      document.getElementById('results').classList.add('hidden');
+    }
+
+    function fmtTime(totalSec) {
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = Math.round(totalSec % 60);
+      if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      return m + ':' + String(s).padStart(2,'0');
+    }
+
+    function badge(difficulty) {
+      if (difficulty === 'easy') return '<span class="badge badge-easy">輕鬆</span>';
+      if (difficulty === 'med') return '<span class="badge badge-med">挑戰</span>';
+      if (difficulty === 'run') return '<span class="badge badge-run">跑步</span>';
+      return '<span class="badge badge-hard">地獄</span>';
+    }
+
+    function calculate() {
+      let totalSec, km1Sec, sledSec;
+
+      if (currentMode === 'input') {
+        const rm = parseInt(document.getElementById('run-min').value) || 5;
+        const rs = parseInt(document.getElementById('run-sec').value) || 30;
+        km1Sec = rm * 60 + rs;
+        const sm = parseInt(document.getElementById('sled-min').value) || 2;
+        const ss = parseInt(document.getElementById('sled-sec').value) || 30;
+        sledSec = sm * 60 + ss;
+        const level = document.getElementById('level').value;
+        const fatigueMult = level === 'beginner' ? 1.25 : level === 'intermediate' ? 1.15 : 1.05;
+        const gender = document.getElementById('gender').value;
+        const genderMult = gender === 'female' ? 0.9 : 1.0;
+        totalSec = estimateTotal(km1Sec, sledSec, fatigueMult, genderMult);
+      } else {
+        const th = parseInt(document.getElementById('target-hr').value) || 1;
+        const tm = parseInt(document.getElementById('target-min').value) || 15;
+        totalSec = th * 3600 + tm * 60;
+        km1Sec = Math.round(totalSec * 0.45 / 8);
+        sledSec = Math.round(totalSec * 0.07);
+      }
+
+      const roxzoneSec = Math.round(totalSec * 0.06);
+      const stationTotal = Math.round(totalSec * 0.45);
+      const runTotal = totalSec - stationTotal - roxzoneSec;
+
+      document.getElementById('res-total').textContent = fmtTime(totalSec);
+      document.getElementById('res-run').textContent = fmtTime(runTotal);
+      document.getElementById('res-station').textContent = fmtTime(stationTotal);
+      document.getElementById('res-roxzone').textContent = fmtTime(roxzoneSec);
+
+      const warnBox = document.getElementById('warn-box');
+      const warnText = document.getElementById('warn-text');
+      if (km1Sec < 240) {
+        warnBox.classList.remove('hidden');
+        warnText.textContent = '你嘅跑步速度好快！記住比賽係8km+8個station，建議第一個1km保守10-15秒，唔好爆咗頭段。';
+      } else if (km1Sec > 420) {
+        warnBox.classList.remove('hidden');
+        warnText.textContent = '建議提升基礎跑步耐力，目標係將1km時間縮短至7分鐘以下，完賽體驗會好好多。';
+      } else {
+        warnBox.classList.add('hidden');
+      }
+
+      buildPaceTable(km1Sec, sledSec, stationTotal, runTotal, roxzoneSec);
+      setTip(km1Sec, sledSec);
+
+      const results = document.getElementById('results');
+      results.classList.remove('hidden');
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function estimateTotal(km1Sec, sledSec, fatigueMult, genderMult) {
+      const runTotal = km1Sec * 8 * fatigueMult;
+      const stationBase = sledSec * 8 * 1.1 * genderMult;
+      const roxzone = 240;
+      return Math.round(runTotal + stationBase + roxzone);
+    }
+
+    function buildPaceTable(km1Sec, sledSec, stationTotal, runTotal, roxzoneSec) {
+      const stations = [
+        { name: 'SkiErg 100m', pct: 0.11, diff: 'med' },
+        { name: 'Sled Push 50m', pct: 0.16, diff: 'hard' },
+        { name: 'Sled Pull 50m', pct: 0.15, diff: 'hard' },
+        { name: 'Burpee Broad Jump 80m', pct: 0.13, diff: 'hard' },
+        { name: 'Rowing 1000m', pct: 0.14, diff: 'med' },
+        { name: 'Farmers Carry 200m', pct: 0.08, diff: 'easy' },
+        { name: 'Sandbag Lunges 100m', pct: 0.12, diff: 'hard' },
+        { name: 'Wall Balls 100次', pct: 0.11, diff: 'hard' },
+      ];
+
+      const runPerKm = Math.round(runTotal / 8);
+      const roxzoneEach = Math.round(roxzoneSec / 8);
+      let cumulative = 0;
+      let html = '';
+
+      for (let i = 0; i < 8; i++) {
+        const runSec = Math.round(runPerKm * (1 + i * 0.02));
+        cumulative += runSec;
+        html += `<tr class="run-row">
+          <td>第${i + 1}km 跑步</td>
+          <td>${fmtTime(runSec)}</td>
+          <td>${fmtTime(cumulative)}</td>
+          <td>${badge('run')}</td>
+        </tr>`;
+
+        cumulative += roxzoneEach;
+        const stSec = Math.round(stationTotal * stations[i].pct);
+        cumulative += stSec;
+        html += `<tr>
+          <td><strong>${stations[i].name}</strong> <span style="font-size:11px;color:var(--text-dim)">(+${fmtTime(roxzoneEach)} Roxzone)</span></td>
+          <td>${fmtTime(stSec)}</td>
+          <td>${fmtTime(cumulative)}</td>
+          <td>${badge(stations[i].diff)}</td>
+        </tr>`;
+      }
+
+      document.getElementById('pace-body').innerHTML = html;
+    }
+
+    function setTip(km1Sec, sledSec) {
+      let tip = '';
+      const ratio = sledSec / km1Sec;
+      if (ratio > 0.6) {
+        tip = '你嘅Sled時間相對跑步偏長，代表力量係弱項。建議備賽多加Sled Push/Pull訓練，同時加強核心力量。';
+      } else if (km1Sec > 360) {
+        tip = '跑步耐力係你主要提升空間。建議每週加入2次Zone 2慢跑（30-45分鐘），改善有氧基礎，Wall Balls埋尾就唔會崩潰。';
+      } else {
+        tip = '你嘅體能分佈均衡！重點係比賽策略：頭2個1km刻意慢10秒，Sled Push唔好爆盡，留力俾最後Wall Balls。';
+      }
+      document.getElementById('tip-text').textContent = tip;
+    }
+  </script>
+</body>
+</html>
